@@ -316,6 +316,7 @@ export default {
     title: 'Reports',
     subtitle: 'How much work, and where',
     exportCsv: 'Export CSV',
+    exportPdf: 'Export PDF',
     from: 'From',
     to: 'To',
     totalJobs: 'Total jobs',

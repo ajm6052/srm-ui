@@ -56,21 +56,22 @@ function barPct(count, rows) {
 }
 const hasData = computed(() => (d.value.total || 0) > 0)
 
-// CSV export of the current window. Same [from, to) the dashboard requests, so
-// the file matches what's on screen. Filename carries the window for the reader.
-const exporting = ref(false)
-async function exportCsv() {
-  exporting.value = true
+// Export the current window as CSV or PDF. Same [from, to) the dashboard
+// requests, so the file matches what's on screen. `exporting` holds the format
+// currently downloading ('' when idle) so each button shows its own spinner.
+const exporting = ref('')
+async function exportReport(format) {
+  exporting.value = format
   try {
     const toExclusive = new Date(to.value + 'T00:00:00')
     toExclusive.setDate(toExclusive.getDate() + 1)
-    await download('/api/reports/export', `srm-report_${from.value}_${to.value}.csv`, {
-      params: { from: from.value, to: toExclusive.toISOString().slice(0, 10) },
-    })
+    const params = { from: from.value, to: toExclusive.toISOString().slice(0, 10) }
+    if (format === 'pdf') params.format = 'pdf'
+    await download('/api/reports/export', `srm-report_${from.value}_${to.value}.${format}`, { params })
   } catch (err) {
     messages.error(err.message || t('toast.genericError'))
   } finally {
-    exporting.value = false
+    exporting.value = ''
   }
 }
 </script>
@@ -108,11 +109,21 @@ async function exportCsv() {
         variant="tonal"
         color="primary"
         prepend-icon="$download"
-        :loading="exporting"
-        :disabled="!hasData"
-        @click="exportCsv"
+        :loading="exporting === 'csv'"
+        :disabled="!hasData || (!!exporting && exporting !== 'csv')"
+        @click="exportReport('csv')"
       >
         {{ $t('reports.exportCsv') }}
+      </v-btn>
+      <v-btn
+        variant="outlined"
+        color="primary"
+        prepend-icon="$download"
+        :loading="exporting === 'pdf'"
+        :disabled="!hasData || (!!exporting && exporting !== 'pdf')"
+        @click="exportReport('pdf')"
+      >
+        {{ $t('reports.exportPdf') }}
       </v-btn>
     </div>
 

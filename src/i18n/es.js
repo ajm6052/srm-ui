@@ -315,6 +315,7 @@ export default {
     title: 'Informes',
     subtitle: 'Cuánto trabajo, y dónde',
     exportCsv: 'Exportar CSV',
+    exportPdf: 'Exportar PDF',
     from: 'Desde',
     to: 'Hasta',
     totalJobs: 'Trabajos totales',
