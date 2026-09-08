@@ -34,4 +34,10 @@ export default defineConfig({
   build: {
     sourcemap: true,
   },
+  // Vitest picks up this config (aliases included). Tests live in test/ and run in
+  // jsdom so localStorage / document are available to the i18n and store code.
+  test: {
+    environment: 'jsdom',
+    include: ['test/**/*.test.js'],
+  },
 })

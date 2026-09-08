@@ -17,6 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # This project uses Yarn Berry (see packageManager in package.json); Corepack
+      # provisions the pinned version. Enable it before setup-node so the cache and
+      # install use that Yarn, not the runner's bundled Yarn 1.
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -24,10 +30,13 @@ jobs:
           cache: yarn
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install --immutable
 
       - name: i18n catalog parity (EN/ES)
         run: node scripts/check-i18n.mjs
+
+      - name: Unit tests (Vitest)
+        run: yarn test
 
       - name: Build
         run: yarn build

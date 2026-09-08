@@ -39,14 +39,16 @@ bell** in the nav updates live as work changes.
 
 ## Quick start
 
-Requires **Node ≥ 18** and **[Yarn](https://classic.yarnpkg.com/) (1.22.x)**, and
-the [SRM API](https://github.com/ajm6052/srm) running on `:2020`
+Requires **Node ≥ 18** with **Corepack** enabled — it provisions the Yarn version
+pinned in `packageManager` (Yarn Berry v4), so you don't install Yarn yourself —
+and the [SRM API](https://github.com/ajm6052/srm) running on `:2020`
 (`cd ../srm && make seed && make dev-air`).
 
 ```bash
-cp .env.example .env       # optional — defaults point at the local API on :2020
+corepack enable            # one-time: use the project's pinned Yarn
+cp .env.example .env        # optional — defaults point at the local API on :2020
 yarn install
-yarn dev                   # http://localhost:4100
+yarn dev                    # http://localhost:4100
 ```
 
 The dev port (4100) is in the API's CORS allowlist out of the box. Point the UI at
@@ -89,12 +91,22 @@ src/
 ## Scripts
 
 ```bash
-yarn dev       # start the Vite dev server (:4100)
-yarn build     # production build to dist/
-yarn preview   # serve the production build locally
+yarn dev         # start the Vite dev server (:4100)
+yarn build       # production build to dist/
+yarn preview     # serve the production build locally
+yarn test        # run the unit tests once (Vitest)
+yarn test:watch  # re-run tests on change
 ```
+
+## Testing
+
+Unit tests live in [`test/`](test) and run under [Vitest](https://vitest.dev/)
+(jsdom). They cover the parts where a bug is silent but costly: the timezone/DST
+date math (`utils/calendar`), the permission-gating getters (`stores/auth`), and
+the i18n locale switching. Run them with `yarn test`.
 
 ## CI
 
 [GitHub Actions](.github/workflows/ci.yml) runs on every push and PR: installs with
-a frozen lockfile, verifies **EN/ES catalog parity**, and runs the production build.
+an immutable lockfile (Corepack-provisioned Yarn), verifies **EN/ES catalog
+parity**, runs the **Vitest** unit tests, and runs the production build.
