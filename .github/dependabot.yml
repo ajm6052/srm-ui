@@ -1,0 +1,29 @@
+# Dependabot keeps dependencies patched and current via pull requests, which then
+# run through CI (i18n parity + build) before you merge.
+version: 2
+updates:
+  # JS dependencies (package.json / yarn.lock — the "npm" ecosystem covers Yarn)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    # Roll routine minor/patch bumps into a single PR to keep the volume low;
+    # majors (more likely to break) still come as their own PRs.
+    groups:
+      npm-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "deps"
+
+  # The action versions pinned in .github/workflows/*.yml
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
