@@ -17,7 +17,7 @@
     "vue": "^3.4.21",
     "vue-i18n": "9",
     "vue-router": "^4.3.0",
-    "vuetify": "^3.5.14"
+    "vuetify": "^4.2.0"
   },
   "devDependencies": {
     "@mdi/js": "^7.4.47",
