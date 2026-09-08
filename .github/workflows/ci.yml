@@ -15,7 +15,7 @@ jobs:
     name: Build & checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # This project uses Yarn Berry (see packageManager in package.json); Corepack
       # provisions the pinned version. Enable it before setup-node so the cache and
@@ -24,7 +24,7 @@ jobs:
         run: corepack enable
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: yarn
