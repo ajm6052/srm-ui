@@ -72,7 +72,11 @@ const links = computed(() =>
     { label: 'nav.users', to: { name: 'users' }, icon: '$users', show: auth.can('users:view') },
     { label: 'nav.customers', to: { name: 'customers' }, icon: '$company', show: auth.can('customers:view') },
     { label: 'nav.reports', to: { name: 'reports' }, icon: '$reports', show: auth.can('reports:view') },
-    { label: 'nav.support', to: { name: 'support' }, icon: '$support', show: auth.can('support:create') },
+    // The per-company support desk is for a company to reach the platform team.
+    // Platform staff ARE that team — they triage every company's tickets in the
+    // Admin → Support tab — and belong to the internal company, which files none,
+    // so the desk would only ever look empty for them. Hide it for staff.
+    { label: 'nav.support', to: { name: 'support' }, icon: '$support', show: auth.can('support:create') && !auth.isPlatformStaff },
     { label: 'nav.permissions', to: { name: 'permissions' }, icon: '$permissions', show: auth.canViewPermissions },
     { label: 'nav.admin', to: { name: 'admin' }, icon: '$admin', show: auth.isPlatformAdmin },
   ].filter((l) => l.show),
