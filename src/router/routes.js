@@ -98,7 +98,9 @@ export default [
     path: '/support',
     name: 'support',
     component: () => import('@views/support.vue'),
-    meta: { authRequired: true, permission: 'support:create' },
+    // companyOnly: the per-company desk isn't for platform staff (they triage in
+    // the admin panel); the guard redirects them there.
+    meta: { authRequired: true, permission: 'support:create', companyOnly: true },
   },
   {
     path: '/permissions',

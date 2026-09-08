@@ -29,6 +29,14 @@ router.beforeEach((routeTo, routeFrom, next) => {
   if (routeTo.meta.ownerOrStaff && auth.loggedIn && !auth.canViewPermissions) {
     return next(auth.homeRoute)
   }
+  // Company-desk routes (e.g. the support desk) are for a company to reach the
+  // platform team. Staff ARE that team and triage every company's tickets in the
+  // admin panel — and their own internal company files none — so send them there
+  // rather than to an empty per-company page. (`can()` is true for a superadmin,
+  // so the permission check below wouldn't stop them.)
+  if (routeTo.meta.companyOnly && auth.isPlatformStaff) {
+    return next({ name: 'admin' })
+  }
   // Company routes: platform-only staff (no company) belong in the admin panel;
   // a company user lacking the permission goes to their home. Routes flagged
   // platformStaffOk (the schedule) instead admit staff, who get a read-only
