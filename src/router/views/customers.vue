@@ -1,18 +1,28 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCustomersStore } from '@stores/customers'
 import { useAuthStore } from '@stores/auth'
 import { useMessagesStore } from '@stores/messages'
+import { useCrossCompany } from '@src/composables/useCrossCompany'
+import CompanyFilter from '@components/company-filter.vue'
 
 const customers = useCustomersStore()
 const auth = useAuthStore()
 const messages = useMessagesStore()
 const { t } = useI18n({ useScope: 'global' })
 
-const canManage = computed(() => auth.can('customers:manage'))
+// Cross-company (platform operator) mode: read-only list spanning companies.
+const { cross, companyId, companies, mergeCompanies } = useCrossCompany()
 
-onMounted(() => customers.fetch())
+const canManage = computed(() => auth.can('customers:manage') && !cross.value)
+
+async function load() {
+  await customers.fetch({ companyId: companyId.value })
+  if (cross.value) mergeCompanies(customers.items.map((c) => c.company).filter(Boolean))
+}
+onMounted(load)
+watch(companyId, load)
 
 // --- customer create / edit ---
 const dialog = ref(false)
@@ -124,12 +134,16 @@ async function removeSite(c, s) {
 
 <template>
   <v-container fluid class="pa-4 pa-md-6">
-    <div class="d-flex align-center mb-4">
+    <div class="d-flex align-center mb-4 flex-wrap ga-3">
       <div>
         <h1 class="text-h5 font-weight-bold">{{ $t('customers.title') }}</h1>
         <div class="text-medium-emphasis">{{ $t('customers.subtitle') }}</div>
       </div>
+      <v-chip v-if="cross" size="small" color="deep-purple" variant="tonal" prepend-icon="$admin">
+        {{ $t('common.crossCompanyReadOnly') }}
+      </v-chip>
       <v-spacer />
+      <company-filter v-if="cross" v-model="companyId" :companies="companies" />
       <v-btn v-if="canManage" color="primary" prepend-icon="$addNew" @click="openCreate">{{ $t('customers.addCustomer') }}</v-btn>
     </div>
 
@@ -153,6 +167,9 @@ async function removeSite(c, s) {
               </div>
             </div>
             <v-spacer />
+            <v-chip v-if="cross && c.company" size="small" variant="tonal" color="indigo" class="mr-2">
+              <v-icon icon="$company" start size="x-small" />{{ c.company.name }}
+            </v-chip>
             <v-chip size="small" variant="tonal" color="secondary" class="mr-2">
               {{ $t('customers.siteCount', (c.sites || []).length) }}
             </v-chip>

@@ -7,10 +7,12 @@ export const useTeamsStore = defineStore('teams', {
     loading: false,
   }),
   actions: {
-    async fetch() {
+    // companyId narrows a platform operator's cross-company list to one company
+    // (null = every company they may see); ignored for a normal company session.
+    async fetch({ companyId = null } = {}) {
       this.loading = true
       try {
-        const { data } = await api.get('/api/teams')
+        const { data } = await api.get('/api/teams', { company_id: companyId })
         this.items = data || []
       } finally {
         this.loading = false

@@ -30,6 +30,10 @@ export const useAuthStore = defineStore('auth', {
     isSuperAdmin: (state) => !!state.user?.is_super_admin,
     role: (state) => state.user?.role || '',
     hasCompany: (state) => !!state.company,
+    // A platform-staff session with no company selected sees Teams/Users/Customers/
+    // Reports as read-only CROSS-COMPANY views: a superadmin spans every company, a
+    // support agent only its assigned ones (the API enforces the actual reach).
+    crossCompany: (state) => !!state.user?.is_platform_staff && !state.company,
     activeCompanyId: (state) => state.company?.id || null,
     hasMultipleWorkspaces: (state) => (state.memberships?.length || 0) > 1,
     can: (state) => (permission) => state.isSuperAdmin || state.permissions.includes(permission),

@@ -32,7 +32,18 @@ export function configureAmplify() {
 // temporary password and must set a new one (the force-change flow). Any other
 // challenge (MFA, etc.) throws a stable code so the caller can show a message.
 export async function cognitoSignIn(email, password) {
-  const { isSignedIn, nextStep } = await signIn({ username: email, password })
+  let result
+  try {
+    result = await signIn({ username: email, password })
+  } catch (err) {
+    // A lingering Amplify session (another tab, or a force-change flow whose /me
+    // handshake failed) makes signIn throw UserAlreadyAuthenticatedException. Clear
+    // it and try once more so the entered credentials always establish the session.
+    if (err?.name !== 'UserAlreadyAuthenticatedException') throw err
+    await cognitoSignOut()
+    result = await signIn({ username: email, password })
+  }
+  const { isSignedIn, nextStep } = result
   if (isSignedIn) return 'DONE'
   if (nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') return 'NEW_PASSWORD_REQUIRED'
   throw new Error(`cognito_next_step:${nextStep?.signInStep || 'UNKNOWN'}`)

@@ -43,6 +43,9 @@ router.beforeEach((routeTo, routeFrom, next) => {
   // cross-company view of it.
   if (routeTo.meta.permission && auth.loggedIn) {
     if (routeTo.meta.platformStaffOk && auth.isPlatformStaff) return next()
+    // Cross-company screens: a company-less platform-staff session is admitted to
+    // the read-only all-companies view (the API scopes support to its assignments).
+    if (routeTo.meta.crossCompanyOk && auth.crossCompany) return next()
     if (!auth.hasCompany) return next({ name: 'admin' })
     if (!auth.can(routeTo.meta.permission)) return next({ name: 'schedule' })
   }

@@ -9,10 +9,12 @@ export const useCustomersStore = defineStore('customers', {
     loading: false,
   }),
   actions: {
-    async fetch() {
+    // companyId narrows a platform operator's cross-company list to one company
+    // (null = every company they may see); ignored for a normal company session.
+    async fetch({ companyId = null } = {}) {
       this.loading = true
       try {
-        const res = await api.get('/api/customers')
+        const res = await api.get('/api/customers', { company_id: companyId })
         this.items = res.data || []
       } finally {
         this.loading = false

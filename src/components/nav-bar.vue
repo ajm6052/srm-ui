@@ -59,22 +59,25 @@ async function switchTo(companyId) {
   }
 }
 
-// Nav destinations, each gated by a permission (or the admin flag). Only the
-// ones the signed-in user can actually use are shown — the same rules the API
-// enforces, so a link never leads to a 403.
+// Nav destinations, each gated by what the signed-in session can actually reach,
+// so a link never leads to a bounce or a 403 (the router guard enforces the same
+// rules). The company-scoped screens (teams/users/customers/reports) show for a
+// company user who holds the permission, OR for a platform-staff session with no
+// company selected — which opens them as read-only CROSS-COMPANY views (a
+// superadmin spans every company; support only its assigned ones).
 const links = computed(() =>
   [
     // Platform staff see the schedule too — as the read-only cross-company board.
     { label: 'nav.schedule', to: { name: 'schedule' }, icon: '$schedule', show: auth.can('jobs:view') || auth.isPlatformStaff },
-    { label: 'nav.teams', to: { name: 'teams' }, icon: '$teams', show: auth.can('teams:view') },
-    { label: 'nav.users', to: { name: 'users' }, icon: '$users', show: auth.can('users:view') },
-    { label: 'nav.customers', to: { name: 'customers' }, icon: '$company', show: auth.can('customers:view') },
-    { label: 'nav.reports', to: { name: 'reports' }, icon: '$reports', show: auth.can('reports:view') },
+    { label: 'nav.teams', to: { name: 'teams' }, icon: '$teams', show: (auth.hasCompany && auth.can('teams:view')) || auth.crossCompany },
+    { label: 'nav.users', to: { name: 'users' }, icon: '$users', show: (auth.hasCompany && auth.can('users:view')) || auth.crossCompany },
+    { label: 'nav.customers', to: { name: 'customers' }, icon: '$company', show: (auth.hasCompany && auth.can('customers:view')) || auth.crossCompany },
+    { label: 'nav.reports', to: { name: 'reports' }, icon: '$reports', show: (auth.hasCompany && auth.can('reports:view')) || auth.crossCompany },
     // The per-company support desk is for a company to reach the platform team.
     // Platform staff ARE that team — they triage every company's tickets in the
-    // Admin → Support tab — and belong to the internal company, which files none,
-    // so the desk would only ever look empty for them. Hide it for staff.
-    { label: 'nav.support', to: { name: 'support' }, icon: '$support', show: auth.can('support:create') && !auth.isPlatformStaff },
+    // Admin → Support tab — and belong to no company, which files none, so the desk
+    // would only ever look empty for them. Requires a company; hidden for staff.
+    { label: 'nav.support', to: { name: 'support' }, icon: '$support', show: auth.hasCompany && auth.can('support:create') && !auth.isPlatformStaff },
     { label: 'nav.permissions', to: { name: 'permissions' }, icon: '$permissions', show: auth.canViewPermissions },
     { label: 'nav.admin', to: { name: 'admin' }, icon: '$admin', show: auth.isPlatformAdmin },
   ].filter((l) => l.show),

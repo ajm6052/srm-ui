@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTeamsStore } from '@stores/teams'
 import { useUsersStore } from '@stores/users'
 import { useAuthStore } from '@stores/auth'
 import { useMessagesStore } from '@stores/messages'
+import { useCrossCompany } from '@src/composables/useCrossCompany'
+import CompanyFilter from '@components/company-filter.vue'
 
 const teams = useTeamsStore()
 const users = useUsersStore()
@@ -12,12 +14,23 @@ const auth = useAuthStore()
 const messages = useMessagesStore()
 const { t } = useI18n({ useScope: 'global' })
 
-const canManage = computed(() => auth.can('teams:manage'))
+// Cross-company (platform operator) mode: read-only grid spanning companies.
+const { cross, companyId, companies, mergeCompanies } = useCrossCompany()
+
+const canManage = computed(() => auth.can('teams:manage') && !cross.value)
+
+async function load() {
+  await teams.fetch({ companyId: companyId.value })
+  if (cross.value) mergeCompanies(teams.items.map((tm) => tm.company).filter(Boolean))
+}
 
 onMounted(() => {
-  teams.fetch()
-  if (auth.can('users:view')) users.fetch()
+  load()
+  // The leader / add-member pickers are single-company only, so skip loading users
+  // in the read-only cross-company view.
+  if (!cross.value && auth.can('users:view')) users.fetch()
 })
+watch(companyId, load)
 
 // User pick-list for the leader select and add-member menu.
 const userOptions = computed(() =>
@@ -109,12 +122,16 @@ const addableUsers = computed(() => {
 
 <template>
   <v-container fluid class="pa-4 pa-md-6">
-    <div class="d-flex align-center mb-4">
+    <div class="d-flex align-center mb-4 flex-wrap ga-3">
       <div>
         <h1 class="text-h5 font-weight-bold">{{ $t('teams.title') }}</h1>
         <div class="text-medium-emphasis">{{ $t('teams.subtitle') }}</div>
       </div>
+      <v-chip v-if="cross" size="small" color="deep-purple" variant="tonal" prepend-icon="$admin">
+        {{ $t('common.crossCompanyReadOnly') }}
+      </v-chip>
       <v-spacer />
+      <company-filter v-if="cross" v-model="companyId" :companies="companies" />
       <v-btn v-if="canManage" color="primary" prepend-icon="$addNew" @click="openCreate">{{ $t('teams.newTeam') }}</v-btn>
     </div>
 
@@ -133,22 +150,27 @@ const addableUsers = computed(() => {
               {{ team.leader ? team.leader.name : $t('teams.noLeaderAssigned') }}
             </v-card-subtitle>
           </v-card-item>
-          <v-card-text>
+          <v-card-text class="d-flex flex-wrap ga-2">
             <v-chip size="small" variant="tonal" prepend-icon="$members">
               {{ $t('teams.memberCount', team.member_count) }}
             </v-chip>
+            <v-chip v-if="cross && team.company" size="small" color="indigo" variant="tonal" prepend-icon="$company">
+              {{ team.company.name }}
+            </v-chip>
           </v-card-text>
-          <v-divider />
-          <v-card-actions>
-            <v-btn variant="text" prepend-icon="$members" @click="openMembers(team)">
-              {{ (canManage ? $t('teams.manage') : $t('teams.view')) + ' ' + $t('teams.membersWord') }}
-            </v-btn>
-            <v-spacer />
-            <template v-if="canManage">
-              <v-btn icon="$edit" variant="text" size="small" @click="openEdit(team)" />
-              <v-btn icon="$delete" variant="text" size="small" color="error" @click="removeTeam(team)" />
-            </template>
-          </v-card-actions>
+          <template v-if="!cross">
+            <v-divider />
+            <v-card-actions>
+              <v-btn variant="text" prepend-icon="$members" @click="openMembers(team)">
+                {{ (canManage ? $t('teams.manage') : $t('teams.view')) + ' ' + $t('teams.membersWord') }}
+              </v-btn>
+              <v-spacer />
+              <template v-if="canManage">
+                <v-btn icon="$edit" variant="text" size="small" @click="openEdit(team)" />
+                <v-btn icon="$delete" variant="text" size="small" color="error" @click="removeTeam(team)" />
+              </template>
+            </v-card-actions>
+          </template>
         </v-card>
       </v-col>
     </v-row>

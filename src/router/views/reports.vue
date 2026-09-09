@@ -1,14 +1,20 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useReportsStore } from '@stores/reports'
 import { useMessagesStore } from '@stores/messages'
+import { useCrossCompany } from '@src/composables/useCrossCompany'
+import CompanyFilter from '@components/company-filter.vue'
 import { download } from '@utils/api'
 import { statusColor } from '@utils/calendar'
 
 const reports = useReportsStore()
 const messages = useMessagesStore()
 const { t } = useI18n({ useScope: 'global' })
+
+// Cross-company (platform operator) mode: totals across companies, with a
+// by-company breakdown; picking a company narrows to its own full report.
+const { cross, companyId, companies, mergeCompanies } = useCrossCompany()
 
 // Default window: the last 30 days through today.
 function daysAgo(n) {
@@ -19,15 +25,24 @@ function daysAgo(n) {
 const from = ref(daysAgo(30))
 const to = ref(new Date().toISOString().slice(0, 10))
 
-function load() {
+async function load() {
   // `to` is inclusive in the UI; the API window is [from, to) so add a day.
   const toExclusive = new Date(to.value + 'T00:00:00')
   toExclusive.setDate(toExclusive.getDate() + 1)
-  reports.fetch({ from: from.value, to: toExclusive.toISOString().slice(0, 10) })
+  await reports.fetch({ from: from.value, to: toExclusive.toISOString().slice(0, 10), companyId: companyId.value })
+  // The all-companies report lists every company in by_company; capture them as
+  // stable filter options (a narrowed report returns none, so this never shrinks).
+  if (cross.value) mergeCompanies(reports.data?.by_company)
 }
 onMounted(load)
+watch(companyId, load)
 
-const d = computed(() => reports.data || { total: 0, by_status: {}, by_team: [], by_member: [], by_customer: [] })
+const d = computed(
+  () => reports.data || { total: 0, by_status: {}, by_team: [], by_member: [], by_customer: [], by_company: [] },
+)
+// The by-company breakdown replaces the per-company charts only when viewing ALL
+// companies; drilling into one shows that company's own team/member/customer bars.
+const showByCompany = computed(() => cross.value && companyId.value == null)
 
 // KPI tiles from the status breakdown.
 const kpis = computed(() => {
@@ -66,6 +81,7 @@ async function exportReport(format) {
     const toExclusive = new Date(to.value + 'T00:00:00')
     toExclusive.setDate(toExclusive.getDate() + 1)
     const params = { from: from.value, to: toExclusive.toISOString().slice(0, 10) }
+    if (companyId.value != null) params.company_id = companyId.value
     if (format === 'pdf') params.format = 'pdf'
     await download('/api/reports/export', `srm-report_${from.value}_${to.value}.${format}`, { params })
   } catch (err) {
@@ -83,7 +99,11 @@ async function exportReport(format) {
         <h1 class="text-h5 font-weight-bold">{{ $t('reports.title') }}</h1>
         <div class="text-medium-emphasis">{{ $t('reports.subtitle') }}</div>
       </div>
+      <v-chip v-if="cross" size="small" color="deep-purple" variant="tonal" prepend-icon="$admin">
+        {{ $t('common.crossCompanyReadOnly') }}
+      </v-chip>
       <v-spacer />
+      <company-filter v-if="cross" v-model="companyId" :companies="companies" />
       <v-text-field
         v-model="from"
         type="date"
@@ -160,7 +180,24 @@ async function exportReport(format) {
         </v-col>
 
         <v-col cols="12" md="6">
-          <v-card rounded="lg" variant="outlined" class="h-100">
+          <!-- Cross-company (all): jobs per company. Otherwise: jobs per team. -->
+          <v-card v-if="showByCompany" rounded="lg" variant="outlined" class="h-100">
+            <v-card-title class="text-subtitle-1">{{ $t('reports.byCompany') }}</v-card-title>
+            <v-divider />
+            <v-card-text>
+              <div v-if="d.by_company.length">
+                <div v-for="b in d.by_company" :key="b.id" class="bar-row">
+                  <div class="bar-label text-truncate">{{ b.name }}</div>
+                  <div class="bar-track">
+                    <div class="bar-fill" :style="{ width: barPct(b.count, d.by_company) + '%', background: PRIMARY }" />
+                  </div>
+                  <div class="bar-count">{{ b.count }}</div>
+                </div>
+              </div>
+              <p v-else class="text-caption text-medium-emphasis mb-0">{{ $t('reports.noData') }}</p>
+            </v-card-text>
+          </v-card>
+          <v-card v-else rounded="lg" variant="outlined" class="h-100">
             <v-card-title class="text-subtitle-1">{{ $t('reports.byTeam') }}</v-card-title>
             <v-divider />
             <v-card-text>
@@ -179,7 +216,7 @@ async function exportReport(format) {
         </v-col>
       </v-row>
 
-      <v-row class="mt-1">
+      <v-row v-if="!showByCompany" class="mt-1">
         <v-col cols="12" md="6">
           <v-card rounded="lg" variant="outlined" class="h-100">
             <v-card-title class="text-subtitle-1">{{ $t('reports.byMember') }}</v-card-title>

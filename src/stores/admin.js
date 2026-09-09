@@ -105,8 +105,10 @@ export const useAdminStore = defineStore('admin', {
     listStaff() {
       return api.get('/admin/staff')
     },
-    grantSupport(email) {
-      return api.post('/admin/staff', { email })
+    // Add a support agent: promotes an existing account, or creates one when the
+    // email is new (name is used only for creation).
+    addSupport(name, email) {
+      return api.post('/admin/staff', { name, email })
     },
     revokeStaff(accountId) {
       return api.del(`/admin/staff/${accountId}`)

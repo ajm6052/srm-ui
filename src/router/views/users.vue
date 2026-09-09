@@ -1,17 +1,22 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUsersStore } from '@stores/users'
 import { useAuthStore } from '@stores/auth'
 import { useMessagesStore } from '@stores/messages'
+import { useCrossCompany } from '@src/composables/useCrossCompany'
 import AvailabilityDialog from '@components/availability-dialog.vue'
+import CompanyFilter from '@components/company-filter.vue'
 
 const users = useUsersStore()
 const auth = useAuthStore()
 const messages = useMessagesStore()
 const { t } = useI18n({ useScope: 'global' })
 
-const canManage = computed(() => auth.can('users:manage'))
+// Cross-company (platform operator) mode: read-only list spanning companies.
+const { cross, companyId, companies, mergeCompanies } = useCrossCompany()
+
+const canManage = computed(() => auth.can('users:manage') && !cross.value)
 
 const ROLES = computed(() => [
   { value: 'owner', title: t('roles.owner') },
@@ -31,14 +36,20 @@ const roleColor = {
 // Server-side pagination: the table asks for a page/size, we fetch just that page.
 const page = ref(1)
 const itemsPerPage = ref(25)
-function load() {
-  return users.fetch({ page: page.value, pageSize: itemsPerPage.value })
+async function load() {
+  await users.fetch({ page: page.value, pageSize: itemsPerPage.value, companyId: companyId.value })
+  if (cross.value) mergeCompanies(users.items.map((u) => u.company).filter(Boolean))
 }
 function onOptions(opts) {
   page.value = opts.page
   itemsPerPage.value = opts.itemsPerPage
   load()
 }
+// Re-fetch (from page 1) when the operator changes the company filter.
+watch(companyId, () => {
+  page.value = 1
+  load()
+})
 
 const dialog = ref(false)
 const editing = ref(null)
@@ -96,23 +107,32 @@ async function save() {
   }
 }
 
-const headers = computed(() => [
-  { title: t('common.name'), key: 'name' },
-  { title: t('common.email'), key: 'email' },
-  { title: t('common.role'), key: 'role' },
-  { title: t('common.status'), key: 'is_active' },
-  { title: '', key: 'actions', sortable: false, align: 'end' },
-])
+const headers = computed(() => {
+  const cols = [
+    { title: t('common.name'), key: 'name' },
+    { title: t('common.email'), key: 'email' },
+    { title: t('common.role'), key: 'role' },
+    { title: t('common.status'), key: 'is_active' },
+  ]
+  // In cross-company mode each row names its company.
+  if (cross.value) cols.push({ title: t('common.company'), key: 'company_name', sortable: false })
+  cols.push({ title: '', key: 'actions', sortable: false, align: 'end' })
+  return cols
+})
 </script>
 
 <template>
   <v-container fluid class="pa-4 pa-md-6">
-    <div class="d-flex align-center mb-4">
+    <div class="d-flex align-center mb-4 flex-wrap ga-3">
       <div>
         <h1 class="text-h5 font-weight-bold">{{ $t('users.title') }}</h1>
         <div class="text-medium-emphasis">{{ $t('users.subtitle') }}</div>
       </div>
+      <v-chip v-if="cross" size="small" color="deep-purple" variant="tonal" prepend-icon="$admin">
+        {{ $t('common.crossCompanyReadOnly') }}
+      </v-chip>
       <v-spacer />
+      <company-filter v-if="cross" v-model="companyId" :companies="companies" />
       <v-btn v-if="canManage" color="primary" prepend-icon="$addNew" @click="openCreate">{{ $t('users.addUser') }}</v-btn>
     </div>
 
@@ -145,6 +165,9 @@ const headers = computed(() => [
           <v-chip size="small" :color="item.is_active ? 'success' : 'grey'" variant="tonal">
             {{ item.is_active ? $t('common.active') : $t('common.inactive') }}
           </v-chip>
+        </template>
+        <template #[`item.company_name`]="{ item }">
+          <v-chip v-if="item.company" size="small" color="indigo" variant="tonal">{{ item.company.name }}</v-chip>
         </template>
         <template #[`item.actions`]="{ item }">
           <v-btn

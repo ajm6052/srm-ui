@@ -184,8 +184,6 @@ async function toggleCompany(company) {
 
 // ─── Staff (superadmin) ──────────────────────────────────────────────────────
 const staff = ref([])
-const staffEmail = ref('')
-const grantingStaff = ref(false)
 const platformRoleColor = { support: 'primary', superadmin: 'deep-purple' }
 
 async function loadStaff() {
@@ -197,21 +195,36 @@ async function loadStaff() {
     messages.error(err.message)
   }
 }
-async function grantStaff() {
-  const email = staffEmail.value.trim()
+
+// Add a support agent — name + email, and optionally scope them to companies in
+// the same step. A new email creates the account; an existing one is promoted.
+const addDialog = ref(false)
+const addForm = ref({ name: '', email: '', companies: [] })
+const addingStaff = ref(false)
+function openAddStaff() {
+  addForm.value = { name: '', email: '', companies: [] }
+  addDialog.value = true
+}
+async function addStaff() {
+  const name = addForm.value.name.trim()
+  const email = addForm.value.email.trim()
   if (!email) return
-  grantingStaff.value = true
+  addingStaff.value = true
   try {
-    await admin.grantSupport(email)
-    messages.success(t('admin.nowSupport', { email }))
-    staffEmail.value = ''
+    const account = await admin.addSupport(name, email)
+    if (addForm.value.companies.length) {
+      await admin.setStaffCompanies(account.id, addForm.value.companies)
+    }
+    messages.success(t('admin.staffAdded', { email }))
+    addDialog.value = false
     await loadStaff()
   } catch (err) {
-    if (err.status === 404) messages.error(t('admin.noAccountEmail'))
+    if (err.status === 400) messages.error(t('admin.staffNeedsName'))
+    else if (err.status === 409) messages.error(t('admin.staffEmailInUse'))
     else if (err.status === 403) messages.error(t('admin.cantChangeAccount'))
     else messages.error(err.message)
   } finally {
-    grantingStaff.value = false
+    addingStaff.value = false
   }
 }
 async function revokeStaff(account) {
@@ -782,27 +795,13 @@ const supportHeaders = computed(() => [
 
       <!-- ══════════════ STAFF (superadmin) ══════════════ -->
       <v-window-item value="staff">
-        <v-card rounded="lg" variant="outlined" class="mb-4">
-          <v-card-text>
-            <div class="text-body-2 text-medium-emphasis mb-3">
-              {{ $t('admin.grantIntroBefore') }}<strong>{{ $t('admin.grantIntroBold') }}</strong>{{ $t('admin.grantIntroAfter') }}
-            </div>
-            <div class="d-flex align-center" style="gap: 8px; max-width: 520px">
-              <v-text-field
-                v-model="staffEmail"
-                :placeholder="$t('admin.emailPlaceholder')"
-                prepend-inner-icon="$account"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-                @keyup.enter="grantStaff"
-              />
-              <v-btn color="primary" :loading="grantingStaff" :disabled="!staffEmail.trim()" @click="grantStaff">
-                {{ $t('admin.grantSupport') }}
-              </v-btn>
-            </div>
-          </v-card-text>
-        </v-card>
+        <div class="d-flex align-center mb-4 flex-wrap ga-3">
+          <div class="text-body-2 text-medium-emphasis" style="max-width: 640px">
+            {{ $t('admin.grantIntroBefore') }}<strong>{{ $t('admin.grantIntroBold') }}</strong>{{ $t('admin.grantIntroAfter') }}
+          </div>
+          <v-spacer />
+          <v-btn color="primary" prepend-icon="$addNew" @click="openAddStaff">{{ $t('admin.addSupportUser') }}</v-btn>
+        </div>
 
         <v-card rounded="lg" variant="outlined">
           <v-table>
@@ -829,8 +828,8 @@ const supportHeaders = computed(() => [
                   <span v-if="s.platform_role === 'superadmin'" class="text-caption text-medium-emphasis">
                     {{ $t('admin.allCompanies') }}
                   </span>
-                  <v-chip v-else-if="!s.companies || !s.companies.length" size="small" color="secondary" variant="tonal">
-                    {{ $t('admin.allCompanies') }}
+                  <v-chip v-else-if="!s.companies || !s.companies.length" size="small" color="warning" variant="tonal">
+                    {{ $t('admin.noCompanyAccess') }}
                   </v-chip>
                   <div v-else class="d-flex flex-wrap align-center py-1" style="gap: 4px">
                     <v-chip v-for="c in s.companies.slice(0, 3)" :key="c.id" size="x-small" color="primary" variant="tonal">
@@ -857,6 +856,60 @@ const supportHeaders = computed(() => [
             </tbody>
           </v-table>
         </v-card>
+
+        <!-- Add a support agent: name + email (a new email creates the account, an
+             existing one is promoted), optionally scoped to companies. -->
+        <v-dialog v-model="addDialog" max-width="520">
+          <v-card rounded="lg">
+            <v-card-title class="pa-4">{{ $t('admin.addSupportUser') }}</v-card-title>
+            <v-divider />
+            <v-card-text class="pa-4">
+              <v-text-field
+                v-model="addForm.name"
+                :label="$t('admin.staffName')"
+                prepend-inner-icon="$account"
+                variant="outlined"
+                autofocus
+              />
+              <v-text-field
+                v-model="addForm.email"
+                :label="$t('admin.staffEmail')"
+                type="email"
+                prepend-inner-icon="$account"
+                variant="outlined"
+              />
+              <v-autocomplete
+                v-model="addForm.companies"
+                :items="companyItems"
+                item-title="title"
+                item-value="value"
+                :label="$t('admin.assignedCompanies')"
+                prepend-inner-icon="$company"
+                variant="outlined"
+                multiple
+                chips
+                closable-chips
+                clearable
+              />
+              <p class="text-caption text-medium-emphasis mb-0">{{ $t('admin.staffCompaniesHint') }}</p>
+              <p class="text-caption text-medium-emphasis mb-0 mt-2">{{ $t('admin.staffCognitoHint') }}</p>
+            </v-card-text>
+            <v-divider />
+            <v-card-actions class="pa-3">
+              <v-spacer />
+              <v-btn variant="text" :disabled="addingStaff" @click="addDialog = false">{{ $t('common.cancel') }}</v-btn>
+              <v-btn
+                color="primary"
+                variant="flat"
+                :loading="addingStaff"
+                :disabled="!addForm.email.trim()"
+                @click="addStaff"
+              >
+                {{ $t('common.add') }}
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
 
         <!-- Assign a support agent to specific companies (their assignments ARE
              their access: empty = no company access). -->

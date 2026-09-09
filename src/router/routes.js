@@ -51,25 +51,27 @@ export default [
     path: '/teams',
     name: 'teams',
     component: () => import('@views/teams.vue'),
-    meta: { authRequired: true, permission: 'teams:view' },
+    // crossCompanyOk: platform staff (no company) get the read-only cross-company
+    // list — the API scopes support to its assigned companies.
+    meta: { authRequired: true, permission: 'teams:view', crossCompanyOk: true },
   },
   {
     path: '/users',
     name: 'users',
     component: () => import('@views/users.vue'),
-    meta: { authRequired: true, permission: 'users:view' },
+    meta: { authRequired: true, permission: 'users:view', crossCompanyOk: true },
   },
   {
     path: '/customers',
     name: 'customers',
     component: () => import('@views/customers.vue'),
-    meta: { authRequired: true, permission: 'customers:view' },
+    meta: { authRequired: true, permission: 'customers:view', crossCompanyOk: true },
   },
   {
     path: '/reports',
     name: 'reports',
     component: () => import('@views/reports.vue'),
-    meta: { authRequired: true, permission: 'reports:view' },
+    meta: { authRequired: true, permission: 'reports:view', crossCompanyOk: true },
   },
   {
     path: '/support',

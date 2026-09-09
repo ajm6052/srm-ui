@@ -8,10 +8,12 @@ export const useUsersStore = defineStore('users', {
     loading: false,
   }),
   actions: {
-    async fetch({ page = 1, pageSize = 25 } = {}) {
+    // companyId narrows a platform operator's cross-company list to one company
+    // (null = every company they may see); ignored for a normal company session.
+    async fetch({ page = 1, pageSize = 25, companyId = null } = {}) {
       this.loading = true
       try {
-        const res = await api.get('/api/users', { page, page_size: pageSize })
+        const res = await api.get('/api/users', { page, page_size: pageSize, company_id: companyId })
         this.items = res.data || []
         this.pagination = res.pagination || null
       } finally {
