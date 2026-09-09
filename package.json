@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "deploy": "vite build && aws s3 sync dist s3://srm-website-554075145086-us-east-1-an --delete --exclude index.html --cache-control public,max-age=31536000,immutable --profile erp && aws s3 cp dist/index.html s3://srm-website-554075145086-us-east-1-an/index.html --cache-control no-cache --profile erp && aws cloudfront create-invalidation --distribution-id E3KY4JEG04QNKG --paths '/*' --profile erp"
+    "deploy": "vite build && aws s3 sync dist s3://srm-website-554075145086-us-east-1-an --delete --exclude index.html --cache-control public,max-age=31536000,immutable --profile srm && aws s3 cp dist/index.html s3://srm-website-554075145086-us-east-1-an/index.html --cache-control no-cache --profile srm && aws cloudfront create-invalidation --distribution-id E3KY4JEG04QNKG --paths '/*' --profile srm"
   },
   "dependencies": {
     "aws-amplify": "^6.20.0",
