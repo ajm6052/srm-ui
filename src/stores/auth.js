@@ -1,11 +1,19 @@
 import { defineStore } from 'pinia'
-import { api, setToken, getToken } from '@utils/api'
+import { api, setToken, getToken, setActiveCompany } from '@utils/api'
+import {
+  isCognito,
+  cognitoSignIn,
+  cognitoConfirmNewPassword,
+  cognitoSignOut,
+  cognitoHasSession,
+} from '../plugins/amplify'
 
-// Authentication state for SRM. The token is ours: login/register/switch return a
-// signed JWT for one company, which we persist (via utils/api) and attach to
-// every request. Because one account can belong to several companies, the store
-// also tracks the account's `memberships` (its workspaces) so the app can show a
-// picker at login and a switcher in the nav.
+// Authentication state for SRM. Sign-in is owned by AWS Cognito (via Amplify) on
+// the frontend; the API only verifies the Cognito ID token and never issues one.
+// Because one account can belong to several companies, the store tracks the
+// account's `memberships` (its workspaces) and the active company — sent to the
+// API as the X-Company-Id header (see @utils/api). In dev mode (VITE_AUTH_MODE
+// != 'cognito') the API runs with AUTH_DISABLED and the bearer is just the email.
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -17,63 +25,67 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     loggedIn: (state) => !!state.user,
-    // Platform staff (support or superadmin) can reach the /admin panel.
     isPlatformStaff: (state) => !!state.user?.is_platform_staff,
-    // Alias of "is staff", used by the admin route/nav gate.
     isPlatformAdmin: (state) => !!state.user?.is_platform_admin,
     isSuperAdmin: (state) => !!state.user?.is_super_admin,
     role: (state) => state.user?.role || '',
     hasCompany: (state) => !!state.company,
     activeCompanyId: (state) => state.company?.id || null,
     hasMultipleWorkspaces: (state) => (state.memberships?.length || 0) > 1,
-    // can(permission) — gate company UI controls the way the API gates routes. A
-    // superadmin can do anything; support gets no company permissions (its reach
-    // is the admin tools, not the company screens).
-    can: (state) => (permission) =>
-      state.isSuperAdmin || state.permissions.includes(permission),
-    // The Permissions reference is for the roles meant to understand access
-    // control: a company owner, or platform staff (support / superadmin). Mirrors
-    // the backend's RequireOwnerOrStaff gate.
+    can: (state) => (permission) => state.isSuperAdmin || state.permissions.includes(permission),
     canViewPermissions: (state) => state.role === 'owner' || state.isPlatformStaff,
-    // Where to land after login / bounce a permission failure: the schedule for
-    // company users, the admin panel for platform-only staff.
     homeRoute: (state) => (state.company ? { name: 'schedule' } : { name: 'admin' }),
   },
   actions: {
-    // Apply a login/register/switch result: persist the token and hydrate state.
-    _apply(result) {
-      setToken(result.token)
-      this.user = result.user
-      this.company = result.user?.company || null
-      this.permissions = result.permissions || []
-      if (result.memberships) this.memberships = result.memberships
+    // hydrate loads /api/me and applies the current session. The API resolves the
+    // membership from the X-Company-Id header; if none is set yet and the account
+    // has exactly one workspace, we select it and reload /me so the session lands
+    // in a company instead of a company-less state.
+    async hydrate() {
+      let me = await api.get('/api/me')
+      if (!me.user?.company && (me.memberships?.length || 0) === 1) {
+        setActiveCompany(me.memberships[0].company_id)
+        me = await api.get('/api/me')
+      }
+      this.user = me.user
+      this.company = me.user?.company || null
+      this.permissions = me.permissions || []
+      this.memberships = me.memberships || []
     },
 
+    // logIn establishes a session. In Cognito mode it signs in via Amplify and may
+    // return 'NEW_PASSWORD_REQUIRED' (the caller then collects a new password and
+    // calls confirmNewPassword). In dev mode the email is stored as the bearer. On
+    // 'DONE' the session is hydrated from /me.
     async logIn({ email, password }) {
-      // Email is globally unique, so it alone identifies the account (and its
-      // companies) — no company field at sign-in.
-      const result = await api.post('/auth/login', { email, password })
-      this._apply(result)
-      return result
+      if (isCognito) {
+        const step = await cognitoSignIn(email, password)
+        if (step === 'NEW_PASSWORD_REQUIRED') return step
+      } else {
+        setToken(email.trim().toLowerCase())
+      }
+      await this.hydrate()
+      return 'DONE'
     },
 
-    async register(payload) {
-      const result = await api.post('/auth/register', payload)
-      this._apply(result)
-      return result
+    // confirmNewPassword completes the Cognito force-change challenge, then hydrates.
+    async confirmNewPassword(newPassword) {
+      await cognitoConfirmNewPassword(newPassword)
+      await this.hydrate()
+      return 'DONE'
     },
 
-    // Switch the active company to another workspace the account belongs to. The
-    // current token authorizes the switch; the response carries a new token
-    // scoped to the chosen company.
+    // switchCompany changes the active workspace. Selecting the company sets the
+    // X-Company-Id header; a full reload onto the schedule reslates every cached
+    // store (teams, jobs, …) for the new company — clean and race-free.
     async switchCompany(companyId) {
-      const result = await api.post('/api/switch', { company_id: companyId })
-      this._apply(result)
-      return result
+      if (companyId === this.activeCompanyId) return
+      setActiveCompany(companyId)
+      window.location.assign('/schedule')
     },
 
-    // Update the active company's profile (name and/or IANA time zone) and reflect
-    // the result in local state so the nav chip and schedule pick it up at once.
+    // updateCompanySettings updates the active company's profile (name / IANA time
+    // zone) and reflects it locally so the nav chip and schedule pick it up at once.
     async updateCompanySettings({ name, timezone }) {
       const company = await api.patch('/api/company', { name, timezone })
       this.company = company
@@ -82,39 +94,16 @@ export const useAuthStore = defineStore('auth', {
       return company
     },
 
-    // --- account recovery ---
-
-    // Change the signed-in account's own password (requires the current one).
-    changePassword(currentPassword, newPassword) {
-      return api.post('/api/me/password', {
-        current_password: currentPassword,
-        new_password: newPassword,
-      })
-    },
-
-    // Request a reset link for an email. Always resolves (the API never reveals
-    // whether the email exists), so the UI shows the same confirmation regardless.
-    requestPasswordReset(email) {
-      return api.post('/auth/forgot-password', { email })
-    },
-
-    // Redeem a reset token with a new password.
-    resetPassword(token, newPassword) {
-      return api.post('/auth/reset-password', { token, new_password: newPassword })
-    },
-
-    // Rehydrate from a stored token on app start / hard refresh.
+    // restoreSession rehydrates from an existing Cognito session (or dev token) on
+    // app start / hard refresh. A missing session leaves the app at the login screen.
     async restoreSession() {
-      if (!getToken()) {
+      const hasSession = isCognito ? await cognitoHasSession() : !!getToken()
+      if (!hasSession) {
         this.initialized = true
         return
       }
       try {
-        const { user, permissions, memberships } = await api.get('/api/me')
-        this.user = user
-        this.company = user?.company || null
-        this.permissions = permissions || []
-        this.memberships = memberships || []
+        await this.hydrate()
       } catch {
         this.logOut()
       } finally {
@@ -122,8 +111,10 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    logOut() {
+    async logOut() {
+      if (isCognito) await cognitoSignOut()
       setToken('')
+      setActiveCompany('')
       this.user = null
       this.company = null
       this.permissions = []

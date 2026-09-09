@@ -46,7 +46,7 @@ const form = ref(blank())
 const saving = ref(false)
 
 function blank() {
-  return { name: '', email: '', password: '', role: 'member', is_active: true }
+  return { name: '', email: '', role: 'member', is_active: true }
 }
 function openCreate() {
   editing.value = null
@@ -55,7 +55,7 @@ function openCreate() {
 }
 function openEdit(u) {
   editing.value = u
-  form.value = { name: u.name, email: u.email, password: '', role: u.role, is_active: u.is_active }
+  form.value = { name: u.name, email: u.email, role: u.role, is_active: u.is_active }
   dialog.value = true
 }
 
@@ -81,7 +81,6 @@ async function save() {
       await users.create({
         name: form.value.name,
         email: form.value.email,
-        password: form.value.password,
         role: form.value.role,
       })
       messages.success(t('users.added'))
@@ -176,15 +175,6 @@ const headers = computed(() => [
             :disabled="!!editing"
             :hint="editing ? $t('users.emailImmutable') : ''"
             :persistent-hint="!!editing"
-          />
-          <v-text-field
-            v-if="!editing"
-            v-model="form.password"
-            :label="$t('users.password')"
-            type="password"
-            :hint="$t('users.passwordHint')"
-            prepend-inner-icon="$settings"
-            variant="outlined"
           />
           <v-select
             v-model="form.role"

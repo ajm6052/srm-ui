@@ -26,6 +26,44 @@ export function setToken(token) {
   }
 }
 
+// Active company: the tenant a request acts in, sent as X-Company-Id. The auth
+// store writes it (on login / workspace switch); the request helper reads it here.
+export const ACTIVE_COMPANY_KEY = 'srm.company'
+export function getActiveCompany() {
+  try {
+    return localStorage.getItem(ACTIVE_COMPANY_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+export function setActiveCompany(id) {
+  try {
+    if (id) localStorage.setItem(ACTIVE_COMPANY_KEY, String(id))
+    else localStorage.removeItem(ACTIVE_COMPANY_KEY)
+  } catch {
+    // localStorage unavailable — the selection just won't persist.
+  }
+}
+
+// Optional async source of the bearer token. In Cognito mode the auth layer
+// registers a provider that returns a fresh ID token from Amplify (refreshed as
+// needed); with no provider we fall back to the stored token — dev mode, where the
+// bearer is simply the caller's email under the API's AUTH_DISABLED bypass.
+let tokenProvider = null
+export function setTokenProvider(fn) {
+  tokenProvider = fn
+}
+async function resolveToken() {
+  if (tokenProvider) {
+    try {
+      return (await tokenProvider()) || ''
+    } catch {
+      return ''
+    }
+  }
+  return getToken()
+}
+
 // ApiError carries the HTTP status alongside a human-readable message so callers
 // (and the router's 401 handling) can branch on `status` without re-parsing.
 export class ApiError extends Error {
@@ -51,8 +89,10 @@ async function request(path, { method = 'GET', body, params } = {}) {
   }
 
   const headers = { Accept: 'application/json' }
-  const token = getToken()
+  const token = await resolveToken()
   if (token) headers.Authorization = `Bearer ${token}`
+  const company = getActiveCompany()
+  if (company) headers['X-Company-Id'] = company
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
   let response
@@ -135,8 +175,10 @@ export function streamSSE(path, { onMessage } = {}) {
       controller = new AbortController()
       try {
         const headers = { Accept: 'text/event-stream' }
-        const token = getToken()
+        const token = await resolveToken()
         if (token) headers.Authorization = `Bearer ${token}`
+        const company = getActiveCompany()
+        if (company) headers['X-Company-Id'] = company
         const res = await fetch(BASE_URL + path, { headers, signal: controller.signal })
         if (!res.ok || !res.body) throw new Error(`stream ${res.status}`)
         backoff = 1000 // healthy connection resets the backoff
@@ -186,8 +228,10 @@ export async function download(path, filename, { params } = {}) {
   }
 
   const headers = {}
-  const token = getToken()
+  const token = await resolveToken()
   if (token) headers.Authorization = `Bearer ${token}`
+  const company = getActiveCompany()
+  if (company) headers['X-Company-Id'] = company
 
   let response
   try {

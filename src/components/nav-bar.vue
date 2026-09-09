@@ -5,7 +5,6 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@stores/auth'
 import { useMessagesStore } from '@stores/messages'
 import { useNotificationsStore } from '@stores/notifications'
-import ChangePasswordDialog from '@components/change-password-dialog.vue'
 import CompanySettingsDialog from '@components/company-settings-dialog.vue'
 import LanguageToggle from '@components/language-toggle.vue'
 
@@ -15,7 +14,6 @@ const { t } = useI18n({ useScope: 'global' })
 const messages = useMessagesStore()
 const notifications = useNotificationsStore()
 
-const passwordDialog = ref(false)
 const companyDialog = ref(false)
 
 // Notifications: a company session has an inbox; platform-only staff don't.
@@ -236,9 +234,6 @@ function logOut() {
         <v-list-item v-if="auth.can('company:manage')" :title="$t('nav.companySettings')" @click="companyDialog = true">
           <template #prepend><v-icon icon="$company" /></template>
         </v-list-item>
-        <v-list-item :title="$t('nav.changePassword')" @click="passwordDialog = true">
-          <template #prepend><v-icon icon="$key" /></template>
-        </v-list-item>
         <v-list-item :title="$t('common.signOut')" @click="logOut">
           <template #prepend><v-icon icon="$logout" /></template>
         </v-list-item>
@@ -248,7 +243,6 @@ function logOut() {
   </v-app-bar>
 
   <!-- Kept out of <v-app-bar> so the overlay mounts cleanly when toggled from the menu. -->
-  <change-password-dialog v-model="passwordDialog" />
   <company-settings-dialog v-model="companyDialog" />
 </template>
 

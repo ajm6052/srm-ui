@@ -6,6 +6,7 @@ export default {
   common: {
     save: 'Save',
     cancel: 'Cancel',
+    continue: 'Continue',
     close: 'Close',
     add: 'Add',
     edit: 'Edit',
@@ -74,6 +75,7 @@ export default {
     atLeast8: 'At least 8 characters',
     passwordsMismatch: 'Passwords do not match',
     setNewPassword: 'Set new password',
+    setNewPasswordSubtitle: 'Your account needs a new password to continue.',
     resetLinkInvalid: 'This reset link is invalid or has expired. Request a new one.',
     couldNotReset: 'Could not reset your password.',
   },

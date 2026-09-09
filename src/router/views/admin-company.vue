@@ -53,7 +53,7 @@ const editingUser = ref(null)
 const userForm = ref(blankUser())
 const savingUser = ref(false)
 function blankUser() {
-  return { name: '', email: '', password: '', role: 'member', is_active: true }
+  return { name: '', email: '', role: 'member', is_active: true }
 }
 function openUserCreate() {
   editingUser.value = null
@@ -62,7 +62,7 @@ function openUserCreate() {
 }
 function openUserEdit(u) {
   editingUser.value = u
-  userForm.value = { name: u.name, email: u.email, password: '', role: u.role, is_active: u.is_active }
+  userForm.value = { name: u.name, email: u.email, role: u.role, is_active: u.is_active }
   userDialog.value = true
 }
 async function saveUser() {
@@ -79,7 +79,6 @@ async function saveUser() {
       await admin.createCompanyUser(props.id, {
         name: userForm.value.name,
         email: userForm.value.email,
-        password: userForm.value.password,
         role: userForm.value.role,
       })
       messages.success(t('admin.userAdded'))
@@ -93,24 +92,6 @@ async function saveUser() {
     else messages.error(err.message)
   } finally {
     savingUser.value = false
-  }
-}
-const pwDialog = ref(false)
-const pwUser = ref(null)
-const pwValue = ref('')
-function openPassword(u) {
-  pwUser.value = u
-  pwValue.value = ''
-  pwDialog.value = true
-}
-async function savePassword() {
-  try {
-    await admin.setCompanyUserPassword(props.id, pwUser.value.id, pwValue.value)
-    messages.success(t('admin.passwordReset'))
-    pwDialog.value = false
-  } catch (err) {
-    if (err.status === 403) messages.error(t('admin.onlySuperResetOwner'))
-    else messages.error(err.message)
   }
 }
 
@@ -348,7 +329,6 @@ const jobStatusOptions = computed(() => [
                 <td><v-chip size="small" :color="u.is_active ? 'success' : 'grey'" variant="tonal">{{ u.is_active ? $t('common.active') : $t('common.inactive') }}</v-chip></td>
                 <td class="text-end">
                   <v-btn size="small" variant="text" icon="$edit" @click="openUserEdit(u)" />
-                  <v-btn size="small" variant="text" icon="$key" @click="openPassword(u)" />
                 </td>
               </tr>
               <tr v-if="!users.length"><td colspan="5" class="text-center text-medium-emphasis py-8">{{ $t('admin.noUsers') }}</td></tr>
@@ -446,7 +426,6 @@ const jobStatusOptions = computed(() => [
         <v-card-text class="pa-4">
           <v-text-field v-model="userForm.name" :label="$t('common.name')" prepend-inner-icon="$account" variant="outlined" />
           <v-text-field v-model="userForm.email" :label="$t('common.email')" type="email" variant="outlined" :disabled="!!editingUser" :hint="editingUser ? $t('users.emailImmutable') : ''" :persistent-hint="!!editingUser" />
-          <v-text-field v-if="!editingUser" v-model="userForm.password" :label="$t('users.password')" type="password" :hint="$t('users.passwordHint')" variant="outlined" />
           <v-select v-model="userForm.role" :items="ROLES" :label="$t('common.role')" variant="outlined" :hint="canManageOwners ? '' : $t('admin.ownerHint')" persistent-hint />
           <v-switch v-if="editingUser" v-model="userForm.is_active" :label="userForm.is_active ? $t('common.active') : $t('common.inactive')" color="success" hide-details />
         </v-card-text>
@@ -455,28 +434,6 @@ const jobStatusOptions = computed(() => [
           <v-spacer />
           <v-btn variant="text" :disabled="savingUser" @click="userDialog = false">{{ $t('common.cancel') }}</v-btn>
           <v-btn color="primary" variant="flat" :loading="savingUser" @click="saveUser">{{ $t('common.save') }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Password dialog -->
-    <v-dialog v-model="pwDialog" max-width="420">
-      <v-card rounded="lg">
-        <v-card-title class="pa-4">{{ $t('admin.resetPassword') }}</v-card-title>
-        <v-divider />
-        <v-card-text class="pa-4">
-          <div class="text-body-2 text-medium-emphasis mb-3">
-            <i18n-t keypath="admin.newPasswordFor" tag="span">
-              <template #name><strong>{{ pwUser?.name }}</strong></template>
-            </i18n-t>
-          </div>
-          <v-text-field v-model="pwValue" :label="$t('admin.newPassword')" type="password" :hint="$t('users.passwordHint')" variant="outlined" autofocus />
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="pa-3">
-          <v-spacer />
-          <v-btn variant="text" @click="pwDialog = false">{{ $t('common.cancel') }}</v-btn>
-          <v-btn color="primary" variant="flat" :disabled="pwValue.length < 8" @click="savePassword">{{ $t('admin.reset') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

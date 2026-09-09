@@ -5,6 +5,7 @@ export default {
   common: {
     save: 'Guardar',
     cancel: 'Cancelar',
+    continue: 'Continuar',
     close: 'Cerrar',
     add: 'Agregar',
     edit: 'Editar',
@@ -73,6 +74,7 @@ export default {
     atLeast8: 'Al menos 8 caracteres',
     passwordsMismatch: 'Las contraseñas no coinciden',
     setNewPassword: 'Guardar nueva contraseña',
+    setNewPasswordSubtitle: 'Tu cuenta necesita una nueva contraseña para continuar.',
     resetLinkInvalid: 'Este enlace es inválido o ha expirado. Solicita uno nuevo.',
     couldNotReset: 'No se pudo restablecer tu contraseña.',
   },

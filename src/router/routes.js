@@ -1,5 +1,4 @@
 import { useAuthStore } from '@stores/auth'
-import { useConfigStore } from '@stores/config'
 
 // Route table. Views are lazy-loaded so each screen is its own chunk.
 // `meta.authRequired` gates a route behind a session; `meta.permission` behind a
@@ -21,30 +20,6 @@ export default [
         else next()
       },
     },
-  },
-  {
-    path: '/register',
-    name: 'register',
-    component: () => import('@views/register.vue'),
-    meta: {
-      beforeResolve(routeTo, routeFrom, next) {
-        if (!useConfigStore().registrationEnabled) next({ name: 'login' })
-        else if (useAuthStore().loggedIn) next({ name: 'schedule' })
-        else next()
-      },
-    },
-  },
-  {
-    // Public: request a reset link. Reachable while signed out.
-    path: '/forgot-password',
-    name: 'forgot-password',
-    component: () => import('@views/forgot-password.vue'),
-  },
-  {
-    // Public: redeem a reset token (?token=…). Reachable while signed out.
-    path: '/reset-password',
-    name: 'reset-password',
-    component: () => import('@views/reset-password.vue'),
   },
   {
     path: '/logout',

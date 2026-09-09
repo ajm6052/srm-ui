@@ -3,40 +3,48 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@stores/auth'
-import { useConfigStore } from '@stores/config'
 import LanguageToggle from '@components/language-toggle.vue'
 
 const auth = useAuthStore()
-const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n({ useScope: 'global' })
 
 const email = ref('')
 const password = ref('')
+const newPassword = ref('')
+const challenge = ref(false) // Cognito NEW_PASSWORD_REQUIRED force-change
 const showPassword = ref(false)
 const loading = ref(false)
 const error = ref('')
+
+function go() {
+  if (auth.company) {
+    router.push(route.query.redirectFrom || { name: 'schedule' })
+  } else if (auth.hasMultipleWorkspaces) {
+    router.push({ name: 'select-workspace', query: route.query })
+  } else {
+    // Platform staff with no company membership land in the admin panel.
+    router.push({ name: 'admin' })
+  }
+}
 
 async function submit() {
   error.value = ''
   loading.value = true
   try {
-    const result = await auth.logIn({ email: email.value, password: password.value })
-    // Platform staff with no company land in the admin panel.
-    if (!result.user?.company) {
-      router.push({ name: 'admin' })
+    if (challenge.value) {
+      await auth.confirmNewPassword(newPassword.value)
+      go()
       return
     }
-    // Belongs to more than one company? Let them choose which workspace to open.
-    if (result.memberships && result.memberships.length > 1) {
-      router.push({ name: 'select-workspace', query: route.query })
+    const step = await auth.logIn({ email: email.value, password: password.value })
+    if (step === 'NEW_PASSWORD_REQUIRED') {
+      challenge.value = true
       return
     }
-    const dest = route.query.redirectFrom || { name: 'schedule' }
-    router.push(dest)
+    go()
   } catch (err) {
-    // A wrong email or password both return the same 401 by design.
     error.value = err.status === 401 ? t('auth.signInFailed') : err.message || t('auth.signInFailed')
   } finally {
     loading.value = false
@@ -53,63 +61,62 @@ async function submit() {
       <v-col cols="12" sm="8" md="5" lg="4">
         <div class="text-center mb-6">
           <div class="brand-mark mx-auto">S</div>
-          <h1 class="text-h5 font-weight-bold mt-3">{{ $t('auth.welcomeBack') }}</h1>
-          <p class="text-medium-emphasis">{{ $t('auth.signInSubtitle') }}</p>
+          <h1 class="text-h5 font-weight-bold mt-3">
+            {{ challenge ? $t('auth.setNewPassword') : $t('auth.welcomeBack') }}
+          </h1>
+          <p class="text-medium-emphasis">
+            {{ challenge ? $t('auth.setNewPasswordSubtitle') : $t('auth.signInSubtitle') }}
+          </p>
         </div>
 
         <v-card elevation="2" rounded="xl" border>
           <v-card-text class="pa-6">
             <v-form @submit.prevent="submit">
+              <template v-if="!challenge">
+                <v-text-field
+                  v-model="email"
+                  :label="$t('auth.email')"
+                  type="email"
+                  prepend-inner-icon="$account"
+                  variant="outlined"
+                  autofocus
+                  :disabled="loading"
+                />
+                <v-text-field
+                  v-model="password"
+                  :label="$t('auth.password')"
+                  :type="showPassword ? 'text' : 'password'"
+                  prepend-inner-icon="$settings"
+                  :append-inner-icon="showPassword ? '$hide' : '$show'"
+                  variant="outlined"
+                  :disabled="loading"
+                  @click:append-inner="showPassword = !showPassword"
+                />
+              </template>
+
               <v-text-field
-                v-model="email"
-                :label="$t('auth.email')"
-                type="email"
-                prepend-inner-icon="$account"
-                variant="outlined"
-                autofocus
-                :disabled="loading"
-              />
-              <v-text-field
-                v-model="password"
-                :label="$t('auth.password')"
+                v-else
+                v-model="newPassword"
+                :label="$t('auth.newPassword')"
                 :type="showPassword ? 'text' : 'password'"
                 prepend-inner-icon="$settings"
                 :append-inner-icon="showPassword ? '$hide' : '$show'"
                 variant="outlined"
+                autofocus
                 :disabled="loading"
                 @click:append-inner="showPassword = !showPassword"
               />
-
-              <div class="text-right mb-3" style="margin-top: -8px">
-                <router-link
-                  :to="{ name: 'forgot-password' }"
-                  class="text-caption text-decoration-none"
-                >
-                  {{ $t('auth.forgotPassword') }}
-                </router-link>
-              </div>
 
               <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-4">
                 {{ error }}
               </v-alert>
 
-              <v-btn
-                type="submit"
-                color="primary"
-                size="large"
-                block
-                :loading="loading"
-              >
-                {{ $t('auth.signIn') }}
+              <v-btn type="submit" color="primary" size="large" block :loading="loading">
+                {{ challenge ? $t('common.continue') : $t('auth.signIn') }}
               </v-btn>
             </v-form>
           </v-card-text>
         </v-card>
-
-        <p v-if="config.registrationEnabled" class="text-center text-medium-emphasis mt-4">
-          {{ $t('auth.newHere') }}
-          <router-link :to="{ name: 'register' }">{{ $t('auth.createCompany') }}</router-link>
-        </p>
       </v-col>
     </v-row>
   </v-container>
