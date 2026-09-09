@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@mdi/js": "^7.4.47",
-    "@vitejs/plugin-vue": "^5.0.4",
+    "@vitejs/plugin-vue": "^6.0.8",
     "jsdom": "^30.0.1",
     "sass": "^1.72.0",
     "vite": "^5.2.0",
