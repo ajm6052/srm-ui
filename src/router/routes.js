@@ -1,4 +1,5 @@
 import { useAuthStore } from '@stores/auth'
+import { useConfigStore } from '@stores/config'
 
 // Route table. Views are lazy-loaded so each screen is its own chunk.
 // `meta.authRequired` gates a route behind a session; `meta.permission` behind a
@@ -27,7 +28,8 @@ export default [
     component: () => import('@views/register.vue'),
     meta: {
       beforeResolve(routeTo, routeFrom, next) {
-        if (useAuthStore().loggedIn) next({ name: 'schedule' })
+        if (!useConfigStore().registrationEnabled) next({ name: 'login' })
+        else if (useAuthStore().loggedIn) next({ name: 'schedule' })
         else next()
       },
     },

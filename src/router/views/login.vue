@@ -3,9 +3,11 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@stores/auth'
+import { useConfigStore } from '@stores/config'
 import LanguageToggle from '@components/language-toggle.vue'
 
 const auth = useAuthStore()
+const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n({ useScope: 'global' })
@@ -104,7 +106,7 @@ async function submit() {
           </v-card-text>
         </v-card>
 
-        <p class="text-center text-medium-emphasis mt-4">
+        <p v-if="config.registrationEnabled" class="text-center text-medium-emphasis mt-4">
           {{ $t('auth.newHere') }}
           <router-link :to="{ name: 'register' }">{{ $t('auth.createCompany') }}</router-link>
         </p>
